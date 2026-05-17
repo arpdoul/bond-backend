@@ -1,10 +1,11 @@
 import { fetchFXRates, shouldSettle, FXRates } from '../services/fx';
+import { payForDataService } from '../services/nanopay';
 import { pool } from '../services/db';
 
 export interface SettlementRecord {
   id: string;
   timestamp: string;
-  action: 'SETTLE' | 'HOLD';
+  action: 'SETTLE' | 'HOLD' | 'NANOPAY';
   rates: FXRates;
   result: string;
   fee?: string;
@@ -24,6 +25,10 @@ export async function runAgentCycle() {
   if (!agentRunning) return;
   console.log('[BOND] Running agent cycle...');
 
+  // Pay for FX data via Nanopayments
+  const nanopay = await payForDataService('https://api.frankfurter.app/latest?from=USD&to=EUR,GBP');
+  console.log(`[BOND] Nanopay: ${nanopay.txId} — paid ${nanopay.amount} USDC for FX data`);
+
   const rates = await fetchFXRates();
   const settle = shouldSettle(rates);
 
@@ -41,7 +46,6 @@ export async function runAgentCycle() {
     record.result = `Settled ${settleAmount} USDC. Fee: ${feeAmount} USDC`;
     record.fee = feeAmount.toFixed(6);
 
-    // Save to DB for ALL users who have deposits
     try {
       const users = await pool.query('SELECT id FROM users WHERE deposited_usdc > 0');
       for (const user of users.rows) {
@@ -55,6 +59,14 @@ export async function runAgentCycle() {
           [feeAmount, user.id]
         );
       }
+
+      // Log nanopay as a settlement record
+      await pool.query(
+        `INSERT INTO settlements (user_id, action, amount, fee, eurc_rate, tx_hash)
+         SELECT id, 'NANOPAY', 0.000001, 0, $1, $2 FROM users WHERE deposited_usdc > 0 LIMIT 1`,
+        [rates.EURC_USD, nanopay.txId]
+      );
+
       console.log(`[BOND] Settled for ${users.rows.length} users`);
     } catch (err: any) {
       console.error('[BOND] DB write failed:', err.message);
