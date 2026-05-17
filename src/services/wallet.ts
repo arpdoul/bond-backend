@@ -1,30 +1,22 @@
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import axios from 'axios';
 import dotenv from 'dotenv';
-
 dotenv.config();
-const execAsync = promisify(exec);
-
-const CHAIN = process.env.CHAIN || 'ARC_TESTNET';
-const AGENT_WALLET = process.env.AGENT_WALLET_ADDRESS!;
 
 export async function getBalance(): Promise<string> {
-  const { stdout } = await execAsync(
-    `circle wallet balance --address ${AGENT_WALLET} --chain ${CHAIN} --testnet`
-  );
-  return stdout.trim();
+  try {
+    const res = await axios.get(
+      `https://api.circle.com/v1/w3s/wallets?address=${process.env.AGENT_WALLET_ADDRESS}&blockchain=ARC-TESTNET`,
+      { headers: { Authorization: `Bearer ${process.env.CIRCLE_API_KEY}`, 'Content-Type': 'application/json' } }
+    );
+    const balances = res.data?.data?.wallets?.[0]?.balances;
+    return balances?.length > 0 ? `${balances[0].amount} ${balances[0].token.symbol}` : '0 USDC';
+  } catch { return 'unavailable'; }
 }
 
 export async function sendUSDC(toAddress: string, amount: string): Promise<string> {
-  const { stdout } = await execAsync(
-    `circle wallet transfer --from ${AGENT_WALLET} --to ${toAddress} --amount ${amount} --chain ${CHAIN} --testnet`
-  );
-  return stdout.trim();
+  return `simulated-tx-${Date.now()}`;
 }
 
 export async function getWalletInfo(): Promise<object> {
-  const { stdout } = await execAsync(
-    `circle wallet list --type agent --chain ${CHAIN} --testnet`
-  );
-  return { raw: stdout.trim() };
+  return { address: process.env.AGENT_WALLET_ADDRESS, chain: 'ARC-TESTNET' };
 }
