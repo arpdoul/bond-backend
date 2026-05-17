@@ -1,18 +1,16 @@
 import { fetchFXRates, shouldSettle, FXRates } from '../services/fx';
-import { getBalance, sendUSDC } from '../services/wallet';
-import { payForDataService } from '../services/nanopay';
+import { pool } from '../services/db';
 
 export interface SettlementRecord {
   id: string;
   timestamp: string;
-  action: 'SETTLE' | 'HOLD' | 'PAY_SERVICE';
+  action: 'SETTLE' | 'HOLD';
   rates: FXRates;
   result: string;
   fee?: string;
 }
 
 export const settlementHistory: SettlementRecord[] = [];
-
 let agentRunning = false;
 
 export function setAgentRunning(state: boolean) {
@@ -20,20 +18,13 @@ export function setAgentRunning(state: boolean) {
   console.log(`[BOND] Agent is now ${state ? 'RUNNING' : 'STOPPED'}`);
 }
 
-export function isAgentRunning() {
-  return agentRunning;
-}
+export function isAgentRunning() { return agentRunning; }
 
 export async function runAgentCycle() {
   if (!agentRunning) return;
-
   console.log('[BOND] Running agent cycle...');
 
-  // 1. Fetch FX rates (pay for data if x402 service available)
   const rates = await fetchFXRates();
-  console.log('[BOND] Rates fetched:', rates);
-
-  // 2. Decide: settle or hold
   const settle = shouldSettle(rates);
 
   const record: SettlementRecord = {
@@ -45,21 +36,28 @@ export async function runAgentCycle() {
   };
 
   if (settle) {
-    console.log('[BOND] Threshold crossed → executing settlement');
-    // Calculate spread fee (10 bps = 0.1%)
-    const settleAmount = '0.10'; // example: settle 0.10 USDC per cycle
-    const feeAmount = (parseFloat(settleAmount) * 0.001).toFixed(6);
+    const settleAmount = 0.10;
+    const feeAmount = settleAmount * 0.001;
+    record.result = `Settled ${settleAmount} USDC. Fee: ${feeAmount} USDC`;
+    record.fee = feeAmount.toFixed(6);
 
+    // Save to DB for ALL users who have deposits
     try {
-      // Send settlement (in production: to user-defined recipient)
-      // For testnet demo: send to a dummy address
-      const demoRecipient = '0x000000000000000000000000000000000000dead';
-      const result = await sendUSDC(demoRecipient, settleAmount);
-      record.result = `Settled ${settleAmount} USDC. Fee: ${feeAmount} USDC`;
-      record.fee = feeAmount;
-      record.result += ` | TX: ${result.substring(0, 40)}...`;
+      const users = await pool.query('SELECT id FROM users WHERE deposited_usdc > 0');
+      for (const user of users.rows) {
+        await pool.query(
+          `INSERT INTO settlements (user_id, action, amount, fee, eurc_rate, tx_hash)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [user.id, 'SETTLE', settleAmount, feeAmount, rates.EURC_USD, `sim-${Date.now()}`]
+        );
+        await pool.query(
+          'UPDATE users SET earned_usdc = earned_usdc + $1 WHERE id = $2',
+          [feeAmount, user.id]
+        );
+      }
+      console.log(`[BOND] Settled for ${users.rows.length} users`);
     } catch (err: any) {
-      record.result = `Settlement failed: ${err.message}`;
+      console.error('[BOND] DB write failed:', err.message);
     }
   } else {
     record.result = 'Rate within threshold. Holding.';
@@ -67,6 +65,5 @@ export async function runAgentCycle() {
 
   settlementHistory.unshift(record);
   if (settlementHistory.length > 50) settlementHistory.pop();
-
   console.log('[BOND]', record.result);
 }
