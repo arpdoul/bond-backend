@@ -7,7 +7,7 @@ export const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-export async function initDB() {
+export async function initDB(): Promise<void> {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
       id SERIAL PRIMARY KEY,
