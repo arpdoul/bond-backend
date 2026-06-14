@@ -23,7 +23,7 @@ router.post('/task', async (req: Request, res: Response) => {
 
     // DataCollector does work
     const dataMsg = await client.messages.create({
-      model: 'claude-haiku-4-5', max_tokens: 512,
+      model: 'claude-haiku-20240307', max_tokens: 512,
       messages: [{ role: 'user',
         content: 'You are DataCollector agent. Extract key facts for: ' + task + '. Bullet points only.' }]
     });
@@ -35,7 +35,7 @@ router.post('/task', async (req: Request, res: Response) => {
 
     // Summarizer does work
     const sumMsg = await client.messages.create({
-      model: 'claude-haiku-4-5', max_tokens: 512,
+      model: 'claude-haiku-20240307', max_tokens: 512,
       messages: [{ role: 'user',
         content: 'You are Summarizer agent. Raw data: ' + rawData + '\n\nAnswer clearly: ' + task }]
     });
