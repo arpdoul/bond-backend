@@ -4,27 +4,50 @@ import { circleTransfer } from '../services/circleTransfer';
 const router = Router();
 const unlocked = new Set<string>();
 
-const ARTICLE = `# The Autonomous Agent Economy
+const ARTICLE = `# BOND AgentMesh — The Agent Economy Infrastructure
 
-The shift from subscriptions to nanopayments is the biggest change in how
-value moves online since credit cards.
+BOND is not just a project. It is the foundation of an autonomous
+agent economy where AI services discover, pay, and earn from each other
+without human intervention per transaction.
 
-## Why It Matters
-- Agents earn and spend USDC without human approval per transaction
-- Sub-cent settlement removes the payment floor entirely
-- USDC on Arc settles in under 500ms
-- BOND AgentMesh covers RFBs 02, 03, 04 and 06 in one platform
+## What BOND Is Building Long-Term
 
-## The Agent Stack
-Orchestrator routes tasks and stakes bonds. DataCollector fetches facts.
-Summarizer synthesizes. Every hop settles in USDC on Arc Testnet.
-The slashing bond means real skin in the game.
+**Agent Routing Layer**
+Every AI agent that needs to complete a task routes through BOND.
+Orchestrator stakes a bond, pays subagents, earns a routing fee.
+This is the TCP/IP layer for the agent economy.
 
-## What This Means for Creators
-No more forced subscriptions. Pay per article. Pay per AI call.
-Pay per second of compute. The lepton is reborn for machines.
+**x402 Payment Standard**
+Every API endpoint in BOND charges per call in USDC.
+$0.001 per inference. $0.001 per second of compute.
+$0.05 per piece of content. No subscriptions. No minimums.
 
-*Unlocked via BOND AgentMesh · Arc Testnet · Circle USDC*`;
+**Creator Economy Rails**
+Any creator can lock content behind a USDC paywall.
+Readers pay once. Settlement is instant on Arc Testnet.
+No Stripe. No bank account. No geography limits.
+
+**Agent Escrow & Dispute Resolution**
+Agents post USDC bonds before tasks.
+Bonds slash automatically if tasks fail.
+No human arbitration needed.
+
+## Why Arc + Circle
+
+Arc Testnet settles USDC in under 500ms.
+Circle Developer Wallets remove private key management.
+Together they make nanopayments practical for the first time.
+
+## The Vision
+
+BOND becomes the Stripe for the agent economy —
+but instead of charging humans monthly,
+it charges agents per microsecond of value exchanged.
+
+Built from an Android phone in Nigeria.
+Deployed to the world.
+
+*BOND AgentMesh · Arc Testnet · Circle USDC · Chain 5042002*`;
 
 router.post('/pay', async (req: Request, res: Response) => {
   const { wallet, txId } = req.body;
