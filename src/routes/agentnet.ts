@@ -1,41 +1,44 @@
 import { Router, Request, Response } from 'express';
-import Anthropic from '@anthropic-ai/sdk';
+import axios from 'axios';
 
 const router = Router();
+
+async function callGroq(prompt: string): Promise<string> {
+  const res = await axios.post(
+    'https://api.groq.com/openai/v1/chat/completions',
+    {
+      model: 'llama3-8b-8192',
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 512
+    },
+    { headers: { Authorization: 'Bearer ' + process.env.GROQ_API_KEY,
+        'Content-Type': 'application/json' } }
+  );
+  return res.data.choices[0].message.content;
+}
 
 router.post('/task', async (req: Request, res: Response) => {
   const { task } = req.body;
   const log: any[] = [];
   try {
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
     log.push({ step: 'Orchestrator posts bond', amount: '$0.001',
-      note: 'Slashed if task fails', txId: 'bond-' + Date.now() });
+      txId: 'bond-' + Date.now(), note: 'Slashed if task fails' });
 
-    // Pay DataCollector (simulated - Circle transfer logged)
     log.push({ step: 'Orchestrator -> DataCollector', amount: '$0.001',
       txId: '0x' + Math.random().toString(16).slice(2,18) });
 
-    const dataMsg = await client.messages.create({
-      model: 'claude-haiku-20240307', max_tokens: 512,
-      messages: [{ role: 'user',
-        content: 'You are DataCollector agent. Extract key facts for: ' + task + '. Return bullet points only.' }]
-    });
-    const rawData = (dataMsg.content[0] as any).text;
+    const rawData = await callGroq(
+      'You are DataCollector agent. Extract key facts for: ' + task + '. Bullet points only.'
+    );
 
-    // Pay Summarizer (simulated)
     log.push({ step: 'Orchestrator -> Summarizer', amount: '$0.001',
       txId: '0x' + Math.random().toString(16).slice(2,18) });
 
-    const sumMsg = await client.messages.create({
-      model: 'claude-haiku-20240307', max_tokens: 512,
-      messages: [{ role: 'user',
-        content: 'You are Summarizer. Data: ' + rawData + '\n\nAnswer clearly: ' + task }]
-    });
-    const answer = (sumMsg.content[0] as any).text;
+    const answer = await callGroq(
+      'You are Summarizer agent. Data: ' + rawData + '\n\nAnswer clearly: ' + task
+    );
 
-    log.push({ step: 'Orchestrator profit retained', amount: '$0.001',
-      note: 'Routing fee' });
+    log.push({ step: 'Orchestrator profit retained', amount: '$0.001', note: 'Routing fee' });
 
     res.json({ task, answer, rawData, paymentChain: log, totalCost: '$0.003 USDC' });
   } catch (err: any) {
